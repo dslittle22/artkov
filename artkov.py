@@ -2,6 +2,7 @@ from tkinter import *
 from tkinter import filedialog, colorchooser
 from PIL import ImageTk, Image
 import numpy as np
+from math import floor
 
 """
 Author: Danny Little
@@ -41,10 +42,6 @@ def rgbToHex(rgb):
 def hexToRgb(hexcode):
     hexcode = hexcode[1:]
     return tuple(int(hexcode[i:i+2], 16) for i in (0, 2, 4))
-
-
-print(hexToRgb("#000000"))
-print(hexToRgb("#ffffff"))
 
 
 class Dot():
@@ -90,10 +87,11 @@ class InitialCanvas(Canvas):
 
     def getDots(self):
         for dot in self.dots:
-            print(dot.fill)
-            print(dot.center)
-            print(dot.radius)
-            print(dot.id)
+            print(f'fill color: {dot.fill}')
+            print(f'center: {dot.center}')
+            print(f'radius: {dot.radius}')
+            print(f'id: {dot.id}')
+            print(f'coords: {dot.canvas.coords(dot.id)}')
 
     def makeNext():
         """
@@ -112,29 +110,63 @@ class InitialCanvas(Canvas):
 
 '''
 Routine for creating new pieces:
-last_piece = user-created canvas
+last_canvas = user-created canvas
+delete last canvas
+canvases = 9 new blank canvases
 while(True):
-    create 9 blank canvases
-    fill each one with last_piece makeNext() method
-    store all the dots for the canvas the user picks (or if programmatically, pick one randomly and sleep(500))
-    update last_piece
-    create 9 new canvases
+    fill each one with last_canvas makeNext() method
+    wait for user to pick a canvas, and store dots (or if programmatically, pick one randomly and sleep(500))
+    update last_canvas
+    clear all canvases
 '''
 
 
+def artstart(center, canvas):
+    dots = canvas.dots
+    canvas.destroy()
+    canvases = {}
+    for i in range(9):
+        row = floor(i / 9 * 3)
+        col = i % 3
+        canvases[i] = Canvas(center, bg="white", height=200, width=200)
+        canvases[i].grid(row=row, column=col)
+    middle_canvas = canvases[4]
+    for dot in dots:
+        """
+        self.canvas = canvas
+        self.radius = canvas.dotSize
+        self.center = center
+        self.fill = canvas.dotColor
+
+        x, y = center
+        r = self.radius
+        coords = x + r, y + r, x - r, y - r
+        self.id = canvas.create_oval(
+        """
+        scaling_factor = 200 / 800
+        r = dot.radius * scaling_factor
+        x, y = [coord * scaling_factor for coord in dot.center]
+        coords = x + r, y + r, x - r, y - r
+        middle_canvas.create_oval(coords, fill=dot.fill, width=0)
 
 
+# create root window
 root = Tk(className="Artkov")
 root.geometry("1000x700")
 root.attributes("-fullscreen", True)
 
+# create frames
 top = Frame(root, bg='pink')
 center = Frame(root, bg='white', padx=3, pady=3)
+bottom = Frame(root, bg='pink')
 
+# create frames within center
 center_options = Frame(center)
-canvas = InitialCanvas(center, bg="white", height=700, width=900)
+canvas = InitialCanvas(center, bg="white", height=800, width=800)
 
+# create items within top / center_options
 top_label = Label(top, text='Hi there. Let\'s make some art!')
+exit_button = Button(bottom, text="Exit", command=root.quit)
 
 radius_label = Label(center_options, text='Radius:')
 radius_slider = Scale(center_options, from_=1, to=100,
@@ -144,10 +176,12 @@ color_button = Button(
     center_options, text="Choose new color", command=canvas.pickColor)
 
 go_button = Button(
-    center_options, text="Make some random art!", command=canvas.getDots)
+    center_options, text="Make some random art!", command=lambda: artstart(center, canvas))
 
-top.grid(row=0, column=0)
-center.grid(row=1, column=0)
+# place frames, sub-frames, and items
+top.pack()
+center.pack()
+bottom.pack()
 
 canvas.grid(row=0, column=0)
 center_options.grid(row=0, column=1)
@@ -157,5 +191,6 @@ radius_label.pack()
 radius_slider.pack()
 color_button.pack()
 go_button.pack()
+exit_button.pack()
 
 root.mainloop()
