@@ -4,34 +4,11 @@ from PIL import ImageTk, Image
 import numpy as np
 from math import floor
 from random import choices
+from time import sleep
 
 """
 Author: Danny Little
 
-UI FLOW:
-
-Start with a white canvas and a dot, with:
-- random center
-- random color
-- random size (between a min and max size)
-
-
-(possibly allow user to place, size, and color their own dot)
-
-Have a "start" button.
-When they click start, have a 3x3 grid with that image in the middle, and 8 newly generated art pieces based on that one.
-
-Use markov things for
-- Changing the number of dots
-- Changing the size of each dot
-- Changing the color of each dot
-
-We'd probably want to take the average across the whole piece of size, color, and position, and use that for the next piece.
-
-# of dots / size / color is equally likely to lead to any other.
-Initially, make it basically completely random, meaning that every
-
-But, based on the user's choices, change the transition matrices over time (basically learn the user's preferences).
 """
 
 MIN_NUM_DOTS = 1
@@ -43,7 +20,8 @@ INIT_CANVAS_SIZE = 800
 GRID_CANVAS_SIZE = 200
 CANVAS_SCALING_FACTOR = GRID_CANVAS_SIZE / INIT_CANVAS_SIZE
 
-DROPOFF = 0.75
+SIZE_DROPOFF = 0.75
+COLOR_DROPOFF = 0.95
 # closer to 1 => new choices farther away from previous choice.
 # closer to 0 => new choices closer to previous choice.
 
@@ -60,7 +38,14 @@ for i in range(len(size_tmatrix)):
         elif j == i:
             row.append(DECREASE_REPEATS_PARAM)
         else:
-            row.append(DROPOFF ** abs(j - i))
+            row.append(SIZE_DROPOFF ** abs(j - i))
+
+color_tmatrix = [[] for _ in range(255 + 1)]
+
+for i in range(len(color_tmatrix)):
+    row = color_tmatrix[i]
+    for j in range(len(color_tmatrix)):
+        row.append(COLOR_DROPOFF ** abs(j - i))
 
 
 def rgbToHex(rgb):
@@ -106,26 +91,22 @@ class MyCanvas(Canvas):
         self.delete("all")
         self.dots = []
         for dot in inspiration_dots:
-            # calculate if dot should die / duplicate
-            # if dot dies:
-            #     continue
-            # else if duplicates:
-            #     create a new dot (add to the end of the list)
+            size_choices = [i for i in range(MIN_DOT_SIZE, MAX_DOT_SIZE + 1)]
+            size_probabilities = [size_tmatrix[dot.radius][i]
+                                  for i in size_choices]
+            new_size = choices(size_choices, weights=size_probabilities)[0]
 
-            possible_sizes = [i for i in range(MIN_DOT_SIZE, MAX_DOT_SIZE + 1)]
-            probabilities = [size_tmatrix[dot.radius][i]
-                             for i in possible_sizes]
-            new_size = choices(possible_sizes, weights=probabilities)[0]
+            color_choices = list(range(255 + 1))
+            last_color = hexToRgb(dot.fill)
+            new_color = []
 
-            # choose a new color using transition matrix
+            for color in last_color:
+                color_probabilities = [color_tmatrix[color][i]
+                                       for i in color_choices]
+                new_color.append(
+                    choices(color_choices, weights=color_probabilities)[0])
 
-            Dot(self, dot.center, new_size, dot.fill)
-
-
-def flattenDistrib(distrib):
-    s = sum(distrib)
-    scale = 1 / s
-    return [i * scale for i in distrib]
+            Dot(self, dot.center, new_size, rgbToHex(new_color))
 
 
 class InitialCanvas(MyCanvas):
@@ -147,14 +128,39 @@ class InitialCanvas(MyCanvas):
         self.dotSize = int(val)
 
 
-def artstart(center, canvas):
-    def handleGridClick(last_canvas, canvases):
+def artstart(grid_frame, canvas):
+
+    def make_auto_selection():
+        selected_canvas = canvases[np.random.randint(0, 9)]
+        selected_canvas.configure(bg="#73ff73")
+        handleGridClick(selected_canvas)()
+
+    def handleGridClick(last_canvas, *args):
         def func(*args):
+            last_canvas.configure(bg="white")
             canvases[4].copy_canvas(last_canvas)
             for i, canvas in enumerate(canvases):
                 if i != 4:
                     canvas.makeNext(canvases[4])
         return func
+
+    radius_label.destroy()
+    radius_slider.destroy()
+    color_button.destroy()
+    go_button.destroy()
+    exit_button.destroy()
+
+    center = Frame(grid_frame, bg='white')
+    buttons = Frame(grid_frame, bg='white')
+
+    auto_select_button = Button(
+        buttons, text="Auto-select", command=make_auto_selection)
+    new_exit_button = Button(buttons, text="Exit", command=root.quit)
+
+    center.grid(row=0, column=0)
+    buttons.grid(row=0, column=1)
+    auto_select_button.pack()
+    new_exit_button.pack()
 
     dots = canvas.dots
     canvas.destroy()
@@ -175,18 +181,17 @@ def artstart(center, canvas):
             canvases[i].makeNext(middle_canvas)
 
     for canvas in canvases:
-        canvas.bind("<Button-1>", handleGridClick(canvas, canvases))
+        canvas.bind("<Button-1>", handleGridClick(canvas))
 
 
 # create root window
 root = Tk(className="Artkov")
-root.geometry("1000x700")
+root.geometry("1100x750")
 root.attributes("-fullscreen", True)
 
 # create frames
-top_frame = Frame(root, bg='pink')
-center_frame = Frame(root, bg='white', padx=3, pady=3)
-bottom_frame = Frame(root, bg='pink')
+top_frame = Frame(root, bg='white')
+center_frame = Frame(root, bg='white')
 
 # create frames within center
 center_options = Frame(center_frame)
@@ -195,8 +200,8 @@ init_canvas = InitialCanvas(
 
 # create items within top / center_options
 top_label = Label(top_frame, text='Hi there. Let\'s make some art!')
-exit_button = Button(bottom_frame, text="Exit", command=root.quit)
 
+exit_button = Button(center_options, text="Exit", command=root.quit)
 radius_label = Label(center_options, text='Radius:')
 radius_slider = Scale(center_options, from_=MIN_DOT_SIZE / CANVAS_SCALING_FACTOR, to=MAX_DOT_SIZE / CANVAS_SCALING_FACTOR,
                       orient=HORIZONTAL, command=init_canvas.setDotSize)
@@ -210,7 +215,6 @@ go_button = Button(
 # place frames, sub-frames, and items
 top_frame.pack()
 center_frame.pack()
-bottom_frame.pack()
 
 init_canvas.grid(row=0, column=0)
 center_options.grid(row=0, column=1)
