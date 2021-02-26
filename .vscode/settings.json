@@ -1,3 +1,9 @@
 {
-    "python.pythonPath": "/Users/dannylittle/miniconda3/envs/datasci/bin/python"
+    "python.pythonPath": "/Users/dannylittle/miniconda3/envs/datasci/bin/python",
+    "cSpell.words": [
+        "artkov",
+        "dropoff",
+        "numpy",
+        "tkinter"
+    ]
 }

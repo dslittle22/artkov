@@ -4,15 +4,14 @@ from PIL import ImageTk, Image
 import numpy as np
 from math import floor
 from random import choices
-from time import sleep
 
 """
 Author: Danny Little
 
 """
 root = Tk(className="Artkov")
+root.geometry("1000x750")
 root.attributes("-fullscreen", True)
-
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
 
@@ -25,12 +24,6 @@ MIN_DOT_SIZE = 2
 MAX_DOT_SIZE = int(GRID_CANVAS_SIZE * 0.25)
 INIT_DOT_SIZE = int(0.5 * (MIN_DOT_SIZE + MAX_DOT_SIZE) /
                     CANVAS_SCALING_FACTOR)
-
-print(INIT_CANVAS_SIZE)
-print(GRID_CANVAS_SIZE)
-print(CANVAS_SCALING_FACTOR)
-print(MAX_DOT_SIZE)
-print(INIT_DOT_SIZE)
 
 SIZE_DROPOFF = 0.75
 COLOR_DROPOFF = 0.95
