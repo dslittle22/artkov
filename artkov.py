@@ -10,15 +10,27 @@ from time import sleep
 Author: Danny Little
 
 """
+root = Tk(className="Artkov")
+root.attributes("-fullscreen", True)
+
+screen_width = root.winfo_screenwidth()
+screen_height = root.winfo_screenheight()
 
 MIN_NUM_DOTS = 1
 MAX_NUM_DOTS = 20
-MIN_DOT_SIZE = 2
-MAX_DOT_SIZE = 50
-INIT_DOT_SIZE = 40
-INIT_CANVAS_SIZE = 800
-GRID_CANVAS_SIZE = 200
+INIT_CANVAS_SIZE = int(min(screen_height * 0.9, screen_width * 0.9))
+GRID_CANVAS_SIZE = int(min(screen_height * 0.25, screen_width * 0.25))
 CANVAS_SCALING_FACTOR = GRID_CANVAS_SIZE / INIT_CANVAS_SIZE
+MIN_DOT_SIZE = 2
+MAX_DOT_SIZE = int(GRID_CANVAS_SIZE * 0.25)
+INIT_DOT_SIZE = int(0.5 * (MIN_DOT_SIZE + MAX_DOT_SIZE) /
+                    CANVAS_SCALING_FACTOR)
+
+print(INIT_CANVAS_SIZE)
+print(GRID_CANVAS_SIZE)
+print(CANVAS_SCALING_FACTOR)
+print(MAX_DOT_SIZE)
+print(INIT_DOT_SIZE)
 
 SIZE_DROPOFF = 0.75
 COLOR_DROPOFF = 0.95
@@ -128,102 +140,99 @@ class InitialCanvas(MyCanvas):
         self.dotSize = int(val)
 
 
-def artstart(grid_frame, canvas):
+class CanvasGrid():
+    def __init__(self, center_frame, initial_dots):
+        self.canvases = []
+        for i in range(9):
+            row = floor(i / 9 * 3)
+            col = i % 3
+            self.canvases.append(
+                MyCanvas(center_frame, bg="white", height=GRID_CANVAS_SIZE, width=GRID_CANVAS_SIZE))
+            self.canvases[-1].grid(row=row, column=col)
 
-    def make_auto_selection():
-        selected_canvas = canvases[np.random.randint(0, 9)]
-        selected_canvas.configure(bg="#73ff73")
-        handleGridClick(selected_canvas)()
+        self.middle = self.canvases[4]
+        for dot in initial_dots:
+            scaled_radius = dot.radius * CANVAS_SCALING_FACTOR
+            scaled_center = [
+                coord * CANVAS_SCALING_FACTOR for coord in dot.center]
+            Dot(self.middle, scaled_center, scaled_radius, dot.fill)
 
-    def handleGridClick(last_canvas, *args):
+        for i in range(9):
+            if i != 4:
+                self.canvases[i].makeNext(self.middle)
+
+        for i, canvas in enumerate(self.canvases):
+            canvas.bind("<Button-1>", self.handle_click(i))
+
+    def handle_click(self, last_canvas_idx):
         def func(*args):
-            last_canvas.configure(bg="white")
-            canvases[4].copy_canvas(last_canvas)
-            for i, canvas in enumerate(canvases):
+            self.canvases[4].copy_canvas(self.canvases[last_canvas_idx])
+            for i, canvas in enumerate(self.canvases):
                 if i != 4:
-                    canvas.makeNext(canvases[4])
+                    canvas.makeNext(self.middle)
         return func
 
-    radius_label.destroy()
-    radius_slider.destroy()
-    color_button.destroy()
-    go_button.destroy()
-    exit_button.destroy()
 
-    center = Frame(grid_frame, bg='white')
-    buttons = Frame(grid_frame, bg='white')
+def create_grid_frame(frame, center_options, init_canvas):
+    for widget in center_frame.winfo_children():
+        widget.destroy()
+
+    canvas_grid_frame = Frame(frame)
+    grid_options_frame = Frame(frame)
+
+    init_canvas_dots = init_canvas.dots
+    init_canvas.destroy()
+    canvas_grid = CanvasGrid(canvas_grid_frame, init_canvas_dots)
 
     auto_select_button = Button(
-        buttons, text="Auto-select", command=make_auto_selection)
-    new_exit_button = Button(buttons, text="Exit", command=root.quit)
+        grid_options_frame, text="Auto-select", command=canvas_grid.handle_click(np.random.randint(0, 9)))
+    exit_button = Button(grid_options_frame, text="Exit", command=root.quit)
 
-    center.grid(row=0, column=0)
-    buttons.grid(row=0, column=1)
+    canvas_grid_frame.grid(row=0, column=0)
+    grid_options_frame.grid(row=0, column=1)
+
     auto_select_button.pack()
-    new_exit_button.pack()
-
-    dots = canvas.dots
-    canvas.destroy()
-    canvases = [None] * 9
-    for i in range(9):
-        row = floor(i / 9 * 3)
-        col = i % 3
-        canvases[i] = MyCanvas(center, bg="white", height=200, width=200)
-        canvases[i].grid(row=row, column=col)
-    middle_canvas = canvases[4]
-    for dot in dots:
-        scaled_radius = dot.radius * CANVAS_SCALING_FACTOR
-        scaled_center = [coord * CANVAS_SCALING_FACTOR for coord in dot.center]
-        Dot(middle_canvas, scaled_center, scaled_radius, dot.fill)
-
-    for i in range(9):
-        if i != 4:
-            canvases[i].makeNext(middle_canvas)
-
-    for canvas in canvases:
-        canvas.bind("<Button-1>", handleGridClick(canvas))
+    exit_button.pack()
 
 
-# create root window
-root = Tk(className="Artkov")
-root.geometry("1100x750")
-root.attributes("-fullscreen", True)
+def create_initial_frame(center_frame):
+    center_options = Frame(center_frame)
+    init_canvas = InitialCanvas(
+        center_frame, bg="white", height=INIT_CANVAS_SIZE, width=INIT_CANVAS_SIZE)
+    exit_button = Button(center_options, text="Exit", command=root.quit)
+    radius_label = Label(center_options, text='Radius:')
+    radius_slider = Scale(center_options, from_=MIN_DOT_SIZE / CANVAS_SCALING_FACTOR, to=MAX_DOT_SIZE / CANVAS_SCALING_FACTOR,
+                          orient=HORIZONTAL, command=init_canvas.setDotSize)
+    radius_slider.set(INIT_DOT_SIZE)
+    color_button = Button(
+        center_options, text="Choose new color", command=init_canvas.pickColor)
+
+    # go_button = Button(center_options, text="Make some random art!", command=lambda: artstart(center_frame, init_canvas))
+    go_button = Button(center_options, text="Make some random art!",
+                       command=lambda: create_grid_frame(center_frame, center_options, init_canvas))
+
+    init_canvas.grid(row=0, column=0)
+    center_options.grid(row=0, column=1)
+    radius_label.pack()
+    radius_slider.pack()
+    color_button.pack()
+    go_button.pack()
+    exit_button.pack()
+
 
 # create frames
 top_frame = Frame(root, bg='white')
 center_frame = Frame(root, bg='white')
 
-# create frames within center
-center_options = Frame(center_frame)
-init_canvas = InitialCanvas(
-    center_frame, bg="white", height=INIT_CANVAS_SIZE, width=INIT_CANVAS_SIZE)
-
-# create items within top / center_options
 top_label = Label(top_frame, text='Hi there. Let\'s make some art!')
 
-exit_button = Button(center_options, text="Exit", command=root.quit)
-radius_label = Label(center_options, text='Radius:')
-radius_slider = Scale(center_options, from_=MIN_DOT_SIZE / CANVAS_SCALING_FACTOR, to=MAX_DOT_SIZE / CANVAS_SCALING_FACTOR,
-                      orient=HORIZONTAL, command=init_canvas.setDotSize)
-radius_slider.set(INIT_DOT_SIZE)
-color_button = Button(
-    center_options, text="Choose new color", command=init_canvas.pickColor)
-
-go_button = Button(
-    center_options, text="Make some random art!", command=lambda: artstart(center_frame, init_canvas))
+# create items within center_frame (canvas, buttons)
+create_initial_frame(center_frame)
 
 # place frames, sub-frames, and items
 top_frame.pack()
 center_frame.pack()
 
-init_canvas.grid(row=0, column=0)
-center_options.grid(row=0, column=1)
 top_label.grid(row=0, column=0)
-
-radius_label.pack()
-radius_slider.pack()
-color_button.pack()
-go_button.pack()
-exit_button.pack()
 
 root.mainloop()
