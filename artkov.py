@@ -8,6 +8,14 @@ from random import choices
 """
 Author: Danny Little
 
+A tkinter application that uses markov chains to create dot art. 
+
+After the user fills a canvas with dots to their liking, the
+application will randomly generate 8 additional canvas, with each
+potentially modified in its size and color. 
+
+The application can also select one of these 8 generated canvases, 
+and use that as the next base art piece to modify.
 """
 root = Tk(className="Artkov")
 root.geometry("1000x750")
@@ -260,7 +268,7 @@ def create_initial_frame(center_frame):
     Creates and places a canvas, as well as some controls, on the window.
     The user can click on the canvas to make dots. 
         Args:
-            center_frame (tkinter.Frame): the parent frame for the initial canvas and controls.
+            center_frame (tkinter.Frame): the parent frame for the initial canvas6 and controls.
     """
     center_options = Frame(center_frame)
     init_canvas = InitialCanvas(
